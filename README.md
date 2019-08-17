@@ -20,6 +20,7 @@ python elveg_merge.py [replace | offset | new | tag] [OSM file] [Elveg file]
   * Nodes more than 25 meters away are not considered
   * The highways with the lowest average distance are matched
   * Highways with lengths which are more than 5x different are not matched
+  * Please simplify the Elveg file with a 0.2 factor before running the program
   
 * Manual inspection is necessary in JOSM:
   * The method is not perfect, so manual inspection is necessary
