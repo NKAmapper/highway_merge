@@ -23,7 +23,7 @@ version = "0.5.0"
 debug = True      # True will provide extra keys in OSM file
 
 margin = 25       # Meters of tolarance for matching nodes
-min_margin = 2    # Minimum average distance in meters for matching ways (used with "offset" command to filter large offsets)
+min_margin = 5    # Minimum average distance in meters for matching ways (used with "offset" command to filter large offsets)
 match_factor = 5  # Max times longer/shorter matches
 min_nodes = 2     # Min number of nodes in a way to be matched
 
