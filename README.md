@@ -24,7 +24,7 @@ python elveg_merge.py [replace | offset | new | tag] [OSM file] [Elveg file]
   
 * Manual inspection is necessary in JOSM:
   * The method is not perfect, so manual inspection is necessary
-  * OSM highways which are not automatically merged needs to be replaced or deleted manually
+  * OSM highways which are not automatically merged need to be replaced or deleted manually
   * OSM highways with certain tags (*turn:lanes*, *destination*, *piste*, *snowmbile*, *railway*, *area*) need manual merging (in order to avoid loosing information)
   * Paths need to be reconnected to the new highways from Elveg
   * Relations need repairing
