@@ -18,12 +18,13 @@ import json
 from xml.etree import ElementTree
 
 
-version = "0.5.0"
+version = "0.6.0"
 
 debug = True      # True will provide extra keys in OSM file
 
 margin = 25       # Meters of tolarance for matching nodes
-min_margin = 5    # Minimum average distance in meters for matching ways (used with "offset" command to filter large offsets)
+margin_new = 8    # Meters of tolerance for matching nodes, for "new" command
+min_margin = 2    # Minimum average distance in meters for matching ways (used with "offset" command to filter large offsets)
 match_factor = 5  # Max times longer/shorter matches
 min_nodes = 2     # Min number of nodes in a way to be matched
 
@@ -35,13 +36,13 @@ avoid_tags = ["area", "railway", "piste:type", "snowmobile", "turn:lanes", "turn
 			 "destination", "destination:forward", "destination:backward", "destination:ref", "destination:ref:forward", "destination:ref:backward", \
 			 "destination:symbol", "destination:symbol:forward", "destination:symbol:backward"]
 
-# Overwrite the following tags from Elveg when merging ways
+# Overwrite with the following tags from Elveg when merging ways
 avoid_merge = ["ref", "name", "maxspeed", "oneway", "junction", "foot", "bridge", "tunnel", "layer", "source"]
 
 # Do not consider OSM highways of the following types when updating tags
 avoid_highway_tags = ["cycleway", "footway", "steps"]
 
-# Overwrite the following tags from Elvge when updating tags
+# Overwrite with the following tags from Elveg when updating tags in OSM
 merge_tags = ["ref", "name", "maxspeed", "maxheight", "bridge", "tunnel", "layer"]
 
 # Only consider the following highway categories when merging (leave empty [] to merge all)
@@ -291,6 +292,7 @@ if __name__ == '__main__':
 				for elveg_id, elveg_way in ways_elveg.iteritems():
 					if "osm_id" not in elveg_way and (not replace_highway or elveg_way['highway'] in replace_highway) and \
 						not (elveg_way['highway'] in ["cycleway", "footway"] and osm_way['highway'] not in ["cycleway", "footway", "track"]) and \
+						not (elveg_way['highway'] not in ["cycleway", "footway"] and osm_way['highway'] in ["cycleway", "footway"]) and \
 						elveg_way['min_lat'] <= osm_way['max_lat'] and elveg_way['max_lat'] >= osm_way['min_lat'] and \
 						elveg_way['min_lon'] <= osm_way['max_lon'] and elveg_way['max_lon'] >= osm_way['min_lon'] and \
 						osm_way['length'] < match_factor * elveg_way['length'] and \
@@ -340,7 +342,7 @@ if __name__ == '__main__':
 					ways_elveg[ best_id ]['swap_no'] = count_swap  # Debug
 					ways_elveg[ best_id ]['distance'] = best_distance  # Debug
 
-		message ("\r%i highways matched" % count_swap)
+		message ("\r%i highways matched, %i not matched" % (count_swap, count_osm_roads - count_swap))
 		message ("\n%i missing ways added from Elveg" % (count_elveg - count_swap))
 		message ("\nAverage offset: %.1f m" % (total_distance / count_swap))
 
@@ -362,33 +364,30 @@ if __name__ == '__main__':
 			for osm_id, osm_way in ways_osm.iteritems():
 				if not osm_way['incomplete'] and osm_way['highway'] != None and osm_way['highway'] not in avoid_highway and \
 					not (elveg_way['highway'] in ["cycleway", "footway"] and osm_way['highway'] not in ["cycleway", "footway", "track"]) and \
+					not (elveg_way['highway'] not in ["cycleway", "footway"] and osm_way['highway'] in ["cycleway", "footway"]) and \
 					osm_way['min_lat'] <= elveg_way['max_lat'] and osm_way['max_lat'] >= elveg_way['min_lat'] and \
 					osm_way['min_lon'] <= elveg_way['max_lon'] and osm_way['max_lon'] >= elveg_way['min_lon']:
-#					elveg_way['length'] < 4*match_factor * osm_way['length'] and \
-#					osm_way['length'] < 4*match_factor * elveg_way['length']:
 
 					way_distance = 0.0
 					count_distance = 0
 					match_nodes = []
 
 					for node_osm in osm_way['nodes']:
-						min_node_distance = margin / 3
+						min_node_distance = margin_new
 						for node_elveg in elveg_way['nodes']:
 							node_distance = distance(nodes_osm[node_osm]['lat'], nodes_osm[node_osm]['lon'], \
 														nodes_elveg[node_elveg]['lat'], nodes_elveg[node_elveg]['lon'])
 							if node_distance < min_node_distance:
 								min_node_distance = node_distance
-								min_node_ref = node_elveg
+#								min_node_ref = node_elveg
 
-						if min_node_distance < margin / 3:
+						if min_node_distance < margin_new:
 							count_distance += 1
 							way_distance += min_node_distance
-							if min_node_ref not in match_nodes:
-								match_nodes.append(min_node_ref)
+#							if min_node_ref not in match_nodes:
+#								match_nodes.append(min_node_ref)
 
 					if count_distance >= min_nodes and way_distance / count_distance < best_distance:
-#						if count_distance >= min_nodes and count_distance > best_distance:
-
 						best_id = osm_id
 						best_distance = way_distance / count_distance
 						break
@@ -420,6 +419,7 @@ if __name__ == '__main__':
 				for elveg_id, elveg_way in ways_elveg.iteritems():
 					if elveg_way['highway'] not in avoid_highway_tags and \
 						not (elveg_way['highway'] in ["cycleway", "footway"] and osm_way['highway'] not in ["cycleway", "footway", "track"]) and \
+						not (elveg_way['highway'] not in ["cycleway", "footway"] and osm_way['highway'] in ["cycleway", "footway"]) and \
 						elveg_way['min_lat'] <= osm_way['max_lat'] and elveg_way['max_lat'] >= osm_way['min_lat'] and \
 						elveg_way['min_lon'] <= osm_way['max_lon'] and elveg_way['max_lon'] >= osm_way['min_lon'] and \
 						osm_way['length'] < match_factor * elveg_way['length'] and \
