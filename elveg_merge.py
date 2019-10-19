@@ -18,7 +18,7 @@ import json
 from xml.etree import ElementTree
 
 
-version = "0.6.0"
+version = "0.7.0"
 
 debug = True      # True will provide extra keys in OSM file
 
@@ -379,18 +379,33 @@ if __name__ == '__main__':
 														nodes_elveg[node_elveg]['lat'], nodes_elveg[node_elveg]['lon'])
 							if node_distance < min_node_distance:
 								min_node_distance = node_distance
-#								min_node_ref = node_elveg
+								min_node_ref = node_elveg
 
 						if min_node_distance < margin_new:
 							count_distance += 1
 							way_distance += min_node_distance
-#							if min_node_ref not in match_nodes:
-#								match_nodes.append(min_node_ref)
+							if min_node_ref not in match_nodes:
+								match_nodes.append(min_node_ref)
 
 					if count_distance >= min_nodes and way_distance / count_distance < best_distance:
-						best_id = osm_id
-						best_distance = way_distance / count_distance
-						break
+						match_length = 0
+						prev_lat = nodes_elveg[match_nodes[0]]['lat']
+						prev_lon = nodes_elveg[match_nodes[0]]['lon']
+						for node in match_nodes[1:]:
+							if node in nodes_elveg:
+								match_length += distance(prev_lat, prev_lon, nodes_elveg[node]['lat'], nodes_elveg[node]['lon'])
+								prev_lat = nodes_elveg[node]['lat']
+								prev_lon = nodes_elveg[node]['lon']
+
+						if elveg_way['length'] < match_factor * match_length:
+							best_id = elveg_id
+							best_distance = way_distance / count_distance
+							break
+
+#					if count_distance >= min_nodes and way_distance / count_distance < best_distance:
+#						best_id = osm_id
+#						best_distance = way_distance / count_distance
+#						break
 
 			if best_id == None:
 				ways_elveg[ elveg_id ]['missing'] = True
@@ -607,3 +622,4 @@ if __name__ == '__main__':
 
 	time_lapsed = time.time() - start_time
 	message ("Time: %i seconds (%i ways per second)\n" % (time_lapsed, (count_elveg + count_osm) / time_lapsed))
+
