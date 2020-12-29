@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf8
 
-# replace_elveg
+# highway_merge.py
 # Replace OSM highways with Elveg
-# Usage: python replace_elveg.py [command] [input_osm.osm] [input_elveg.osm]
+# Usage: python highway_merge.py [command] [input_osm.osm] [input_elveg.osm]
 # Commands: - replace: Merge all existing OSM highways with Elveg
 #			- offset: Include all Elveg highways above an certain average offset
 #			- new: Include only Elveg highways not found in OSM
@@ -18,7 +18,7 @@ import json
 from xml.etree import ElementTree
 
 
-version = "0.9.0"
+version = "1.0.0"
 
 debug = False      # True will provide extra keys in OSM file
 merge_all = False  # True will try to merge from OSM even if Elveg way already matched
@@ -286,7 +286,7 @@ if __name__ == '__main__':
 		count_swap = 0
 		total_distance = 0
 
-		for osm_id, osm_way in ways_osm.iteritems():
+		for osm_id, osm_way in iter(ways_osm.items()):
 			if not osm_way['incomplete'] and not osm_way['avoid'] and osm_way['highway'] != None and \
 				(not replace_highway or osm_way['highway'] in replace_highway):
 				message ("\r%i " % count)
@@ -295,7 +295,7 @@ if __name__ == '__main__':
 				best_id = None
 				best_distance = 99999.0
 
-				for elveg_id, elveg_way in ways_elveg.iteritems():
+				for elveg_id, elveg_way in iter(ways_elveg.items()):
 					if ("osm_id" not in elveg_way or merge_all) and \
 						(not replace_highway or elveg_way['highway'] in replace_highway) and \
 						not (elveg_way['highway'] in ["cycleway", "footway"] and osm_way['highway'] not in ["cycleway", "footway", "track"]) and \
@@ -364,14 +364,14 @@ if __name__ == '__main__':
 		count = count_elveg
 		count_missing = 0
 
-		for elveg_id, elveg_way in ways_elveg.iteritems():
+		for elveg_id, elveg_way in iter(ways_elveg.items()):
 			message ("\r%i " % count)
 			count -= 1
 
 			best_id = None
 			best_distance = 99999.0
 
-			for osm_id, osm_way in ways_osm.iteritems():
+			for osm_id, osm_way in iter(ways_osm.items()):
 				if not osm_way['incomplete'] and osm_way['highway'] != None and osm_way['highway'] not in avoid_highway and \
 					not (elveg_way['highway'] in ["cycleway", "footway"] and osm_way['highway'] not in ["cycleway", "footway", "track"]) and \
 					not (elveg_way['highway'] not in ["cycleway", "footway"] and osm_way['highway'] in ["cycleway", "footway"]) and \
@@ -432,7 +432,7 @@ if __name__ == '__main__':
 		count_swap = 0
 		total_distance = 0
 
-		for osm_id, osm_way in ways_osm.iteritems():
+		for osm_id, osm_way in iter(ways_osm.items()):
 			if not osm_way['incomplete'] and not osm_way['avoid'] and osm_way['highway'] != None and osm_way['highway'] not in avoid_highway_tags:
 				message ("\r%i " % count)
 				count -= 1
@@ -441,7 +441,7 @@ if __name__ == '__main__':
 				best_distance = 99999.0
 				best_length = 0
 
-				for elveg_id, elveg_way in ways_elveg.iteritems():
+				for elveg_id, elveg_way in iter(ways_elveg.items()):
 					if elveg_way['highway'] not in avoid_highway_tags and \
 						not (elveg_way['highway'] in ["cycleway", "footway"] and osm_way['highway'] not in ["cycleway", "footway", "track"]) and \
 						not (elveg_way['highway'] not in ["cycleway", "footway"] and osm_way['highway'] in ["cycleway", "footway"]) and \
