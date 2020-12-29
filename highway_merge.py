@@ -2,12 +2,12 @@
 # -*- coding: utf8
 
 # highway_merge.py
-# Replace OSM highways with Elveg
+# Replace OSM highways with Elveg/NVDB
 # Usage: python highway_merge.py [command] [input_osm.osm] [input_elveg.osm]
-# Commands: - replace: Merge all existing OSM highways with Elveg
-#			- offset: Include all Elveg highways above an certain average offset
-#			- new: Include only Elveg highways not found in OSM
-#			- tag: Update OSM highways with attributes from Elveg (maxspeed, name etc)
+# Commands: - replace: Merge all existing OSM highways with Elveg/NVDB
+#			- offset: Include all Elveg/NVDB highways above an certain average offset
+#			- new: Include only Elveg/NVDB highways not found in OSM
+#			- tag: Update OSM highways with attributes from Elveg/NVDB (maxspeed, name etc)
 # Resulting file will be written to a new version of input file
 
 
@@ -18,10 +18,10 @@ import json
 from xml.etree import ElementTree
 
 
-version = "1.0.0"
+version = "1.0.1"
 
 debug = False      # True will provide extra keys in OSM file
-merge_all = False  # True will try to merge from OSM even if Elveg way already matched
+merge_all = False  # True will try to merge from OSM even if Elveg/NVDB way already matched
 
 margin = 25       # Meters of tolarance for matching nodes
 margin_new = 8    # Meters of tolerance for matching nodes, for "new" command
@@ -37,13 +37,13 @@ avoid_tags = ["area", "railway", "piste:type", "snowmobile", "turn:lanes", "turn
 			 "destination", "destination:forward", "destination:backward", "destination:ref", "destination:ref:forward", "destination:ref:backward", \
 			 "destination:symbol", "destination:symbol:forward", "destination:symbol:backward", "mtb:scale", "class:bicycle:mtb"]
 
-# Overwrite with the following tags from Elveg when merging ways
+# Overwrite with the following tags from Elveg/NVDB when merging ways
 avoid_merge = ["ref", "name", "maxspeed", "oneway", "junction", "foot", "bridge", "tunnel", "layer", "source"]
 
 # Do not consider OSM highways of the following types when updating tags
 avoid_highway_tags = ["cycleway", "footway", "steps"]
 
-# Overwrite with the following tags from Elveg when updating tags in OSM
+# Overwrite with the following tags from Elveg/NVDB when updating tags in OSM
 merge_tags = ["ref", "name", "maxspeed", "maxheight", "bridge", "tunnel", "layer"]
 
 # Only consider the following highway categories when merging (leave empty [] to merge all)
@@ -83,7 +83,7 @@ if __name__ == '__main__':
 		filename_osm = sys.argv[2]
 		filename_elveg = sys.argv[3]
 	else:
-		message ("Please include 1) '-new'/'-offset'/'-replace'/'-tag' 2) OSM file and 3) Elveg file as parameters\n")
+		message ("Please include 1) '-new'/'-offset'/'-replace'/'-tag' 2) OSM file and 3) Elveg/NVDB file as parameters\n")
 		sys.exit()
 
 	message ("\nReading files '%s' and '%s' ..." % (filename_osm, filename_elveg))
@@ -126,7 +126,7 @@ if __name__ == '__main__':
 			'lon': float(node.attrib['lon'])
 		}
 
-	message (" %i OSM nodes, %i Elveg nodes" % (len(nodes_osm), len(nodes_elveg)))
+	message (" %i OSM nodes, %i Elveg/NVDB nodes" % (len(nodes_osm), len(nodes_elveg)))
 
 
 	# Determine bounding box and length of OSM ways
@@ -221,7 +221,7 @@ if __name__ == '__main__':
 	message (" %i OSM ways (%i roads)" % (count_osm, count_osm_roads))
 
 
-	# Determine bounding box and length of Elveg ways
+	# Determine bounding box and length of Elveg/NVDB ways
 
 	count_elveg = 0
 	ways_elveg = {}
@@ -273,10 +273,10 @@ if __name__ == '__main__':
 			'nodes': nodes
 		}			
 
-	message (", %i Elveg ways" % count_elveg)
+	message (", %i Elveg/NVDB ways" % count_elveg)
 
 
-	# Merge Elveg and OSM higways
+	# Merge Elveg/NVDB and OSM higways
 
 	message ("\nMatch ways ...\n")
 
@@ -353,11 +353,11 @@ if __name__ == '__main__':
 						ways_osm[ osm_id ]['remove'] = True
 
 		message ("\r%i highways matched, %i not matched" % (count_swap, count_osm_roads - count_swap))
-		message ("\n%i missing ways added from Elveg" % (count_elveg - count_swap))
+		message ("\n%i missing ways added from Elveg/NVDB" % (count_elveg - count_swap))
 		message ("\nAverage offset: %.1f m" % (total_distance / count_swap))
 
 
-	# Identify missing Elveg highways
+	# Identify missing Elveg/NVDB highways
 
 	elif command == "new":
 
@@ -494,7 +494,7 @@ if __name__ == '__main__':
 		message ("\r%i highways matched" % count_swap)	
 
 
-	# Merge Elveg ways with OSM
+	# Merge Elveg/NVDB ways with OSM
 
 	message ("\nTransfer elements ...")
 
@@ -521,7 +521,7 @@ if __name__ == '__main__':
 				tag_osm = way.find("tag[@k='%s']" % tag_elveg.attrib['k'])
 				if tag_elveg.attrib['k'] == "highway":
 					if tag_osm != None and tag_elveg.attrib['v'] != tag_osm.attrib['v']:
-						way.append(ElementTree.Element("tag", k="ELVEG", v=tag_elveg.attrib['v']))
+						way.append(ElementTree.Element("tag", k="NVDB", v=tag_elveg.attrib['v']))
 				elif tag_osm != None:
 					tag_osm.set("v", tag_elveg.attrib['v'])
 				else:
@@ -577,11 +577,11 @@ if __name__ == '__main__':
 				way.set("action", "modify")
 				way.append(ElementTree.Element("tag", k="EDIT", v=";".join(modified_tags)))
 				if debug:
-					way.append(ElementTree.Element("tag", k="ELVEGID", v=elveg_id))
+					way.append(ElementTree.Element("tag", k="NVDBID", v=elveg_id))
 					way.append(ElementTree.Element("tag", k="SWAP", v=str(ways_osm[ osm_id ]['swap_no'])))
 					way.append(ElementTree.Element("tag", k="DISTANCE", v=str(round(ways_osm[ osm_id ]['distance']))))
 
-	# Transfer new Elveg ways to OSM
+	# Transfer new Elveg/NVDB ways to OSM
 
 	for way in root_elveg.findall("way"):
 		elveg_id = way.attrib['id']
@@ -594,7 +594,7 @@ if __name__ == '__main__':
 				if ways_elveg[ elveg_id ]['highway'] != ways_osm[ ways_elveg[elveg_id]['osm_id'] ]['highway']:
 					tag_highway = way.find("tag[@k='highway']")
 					tag_highway.set("v", ways_osm[ ways_elveg[elveg_id]['osm_id'] ]['highway'])
-					way.append(ElementTree.Element("tag", k="ELVEG", v=ways_elveg[ elveg_id ]['highway']))
+					way.append(ElementTree.Element("tag", k="NVDB", v=ways_elveg[ elveg_id ]['highway']))
 				if debug:
 					way.append(ElementTree.Element("tag", k="OSMID", v=ways_elveg[ elveg_id ]['osm_id']))
 					way.append(ElementTree.Element("tag", k="SWAP", v=str(ways_elveg[ elveg_id ]['swap_no'])))
@@ -613,7 +613,7 @@ if __name__ == '__main__':
 		if tag == None and nodes_osm[ node_id ]['used'] == 0:
 			node.set("action", "delete")
 
-	# Add new Elveg nodes
+	# Add new Elveg/NVDB nodes
 
 	for node in root_elveg.iter("node"):
 		node_id = node.attrib['id']
