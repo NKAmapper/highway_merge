@@ -6,7 +6,7 @@
 # Usage: python replace_elveg.py [command] [input_osm.osm] [input_elveg.osm]
 # Commands: - replace: Merge all existing OSM highways with Elveg
 #			- offset: Include all Elveg highways above an certain average offset
-#			- new: Include all Elveg highways not found in OSM
+#			- new: Include only Elveg highways not found in OSM
 #			- tag: Update OSM highways with attributes from Elveg (maxspeed, name etc)
 # Resulting file will be written to a new version of input file
 
@@ -18,23 +18,24 @@ import json
 from xml.etree import ElementTree
 
 
-version = "0.7.0"
+version = "0.9.0"
 
-debug = True      # True will provide extra keys in OSM file
+debug = False      # True will provide extra keys in OSM file
+merge_all = False  # True will try to merge from OSM even if Elveg way already matched
 
 margin = 25       # Meters of tolarance for matching nodes
 margin_new = 8    # Meters of tolerance for matching nodes, for "new" command
-min_margin = 2    # Minimum average distance in meters for matching ways (used with "offset" command to filter large offsets)
+min_margin = 5    # Minimum average distance in meters for matching ways (used with "offset" command to filter large offsets)
 match_factor = 5  # Max times longer/shorter matches
 min_nodes = 2     # Min number of nodes in a way to be matched
 
 # Do not merge OSM ways with the folowing highway categories
-avoid_highway = ["path", "bus_stop", "rest_area", "platform", "construction"]
+avoid_highway = ["path", "bus_stop", "rest_area", "platform", "construction", "proposed"]  # "motorway", "motorway_link"
 
-# Do not merge OSM ways with the following tags
+# Do not merge OSM ways with the following keys
 avoid_tags = ["area", "railway", "piste:type", "snowmobile", "turn:lanes", "turn:lanes:forward", "turn:lanes:backward", \
 			 "destination", "destination:forward", "destination:backward", "destination:ref", "destination:ref:forward", "destination:ref:backward", \
-			 "destination:symbol", "destination:symbol:forward", "destination:symbol:backward"]
+			 "destination:symbol", "destination:symbol:forward", "destination:symbol:backward", "mtb:scale", "class:bicycle:mtb"]
 
 # Overwrite with the following tags from Elveg when merging ways
 avoid_merge = ["ref", "name", "maxspeed", "oneway", "junction", "foot", "bridge", "tunnel", "layer", "source"]
@@ -47,8 +48,8 @@ merge_tags = ["ref", "name", "maxspeed", "maxheight", "bridge", "tunnel", "layer
 
 # Only consider the following highway categories when merging (leave empty [] to merge all)
 replace_highway = []
-#replace_highway = ["trunk", "primary", "secondary", "trunk_link", "primary_link", "secondary_link"]
-
+#replace_highway = ["motorway", "trunk", "primary", "secondary", "motorway_link", "trunk_link", "primary_link", "secondary_link"]
+#replace_highway = ["primary", "secondary", "primary_link", "secondary_link"]
 
 # Output message
 
@@ -77,12 +78,12 @@ if __name__ == '__main__':
 
 	start_time = time.time()
 	
-	if len(sys.argv) == 4 and sys.argv[1].lower() in ["new", "offset", "replace", "tag"]:
-		command = sys.argv[1].lower()
+	if len(sys.argv) == 4 and sys.argv[1].lower() in ["-new", "-offset", "-replace", "-tag"]:
+		command = sys.argv[1].lower().strip("-")
 		filename_osm = sys.argv[2]
 		filename_elveg = sys.argv[3]
 	else:
-		message ("Please include 1) 'new'/'offset'/replace'/'tag' 2) OSM file and 3) Elveg file as parameters\n")
+		message ("Please include 1) '-new'/'-offset'/'-replace'/'-tag' 2) OSM file and 3) Elveg file as parameters\n")
 		sys.exit()
 
 	message ("\nReading files '%s' and '%s' ..." % (filename_osm, filename_elveg))
@@ -104,16 +105,17 @@ if __name__ == '__main__':
 
 	nodes_osm = {}
 	for node in root_osm.iter("node"):
-		nodes_osm[ node.attrib['id'] ] = {
-			'index': node,
-			'used': 0,
-			'lat': float(node.attrib['lat']),
-			'lon': float(node.attrib['lon'])
-		}
-		for tag in node.iter("tag"):
-			if tag.attrib['k'] == "created_by":
-				node.remove(tag)
-				node.set("action", "modify")
+		if not("action" in node.attrib and node.attrib['action'] == "delete"):
+			nodes_osm[ node.attrib['id'] ] = {
+				'index': node,
+				'used': 0,
+				'lat': float(node.attrib['lat']),
+				'lon': float(node.attrib['lon'])
+			}
+			for tag in node.iter("tag"):
+				if tag.attrib['k'] == "created_by":
+					node.remove(tag)
+					node.set("action", "modify")
 
 	nodes_elveg = {}
 	for node in root_elveg.iter("node"):
@@ -164,8 +166,11 @@ if __name__ == '__main__':
 			node_id = node.attrib['ref']
 			if node_id in nodes_osm:
 				nodes_osm[ node_id ]['used'] += 1
-			else:
+			elif not("action" in node.attrib and node.attrib['action'] == "delete"):
 				incomplete = True
+
+		if "action" in way.attrib and way.attrib['action'] == "delete":
+			incomplete = True
 
 		if not incomplete:
 			node_tag = way.find("nd")
@@ -180,18 +185,19 @@ if __name__ == '__main__':
 			prev_lon = min_lon
 
 			for node in way.iter("nd"):
-				node_id = node.attrib['ref']
+				if not("action" in node.attrib and node.attrib['action'] == "delete"):
+					node_id = node.attrib['ref']
 
-				length += distance(prev_lat, prev_lon, nodes_osm[node_id]['lat'], nodes_osm[node_id]['lon'])
-				prev_lat = nodes_osm[node_id]['lat']
-				prev_lon = nodes_osm[node_id]['lon']
+					length += distance(prev_lat, prev_lon, nodes_osm[node_id]['lat'], nodes_osm[node_id]['lon'])
+					prev_lat = nodes_osm[node_id]['lat']
+					prev_lon = nodes_osm[node_id]['lon']
 
-				nodes.append(node_id)
+					nodes.append(node_id)
 
-				min_lat = min(min_lat, prev_lat)
-				min_lon = min(min_lon, prev_lon)
-				max_lat = max(max_lat, prev_lat)
-				max_lon = max(max_lon, prev_lon)
+					min_lat = min(min_lat, prev_lat)
+					min_lon = min(min_lon, prev_lon)
+					max_lat = max(max_lat, prev_lat)
+					max_lon = max(max_lon, prev_lon)
 
 		ways_osm[ way_id ] = {
 			'index': way,
@@ -290,7 +296,8 @@ if __name__ == '__main__':
 				best_distance = 99999.0
 
 				for elveg_id, elveg_way in ways_elveg.iteritems():
-					if "osm_id" not in elveg_way and (not replace_highway or elveg_way['highway'] in replace_highway) and \
+					if ("osm_id" not in elveg_way or merge_all) and \
+						(not replace_highway or elveg_way['highway'] in replace_highway) and \
 						not (elveg_way['highway'] in ["cycleway", "footway"] and osm_way['highway'] not in ["cycleway", "footway", "track"]) and \
 						not (elveg_way['highway'] not in ["cycleway", "footway"] and osm_way['highway'] in ["cycleway", "footway"]) and \
 						elveg_way['min_lat'] <= osm_way['max_lat'] and elveg_way['max_lat'] >= osm_way['min_lat'] and \
@@ -335,12 +342,15 @@ if __name__ == '__main__':
 #								best_distance = count_distance
 
 				if best_id != None and (command == "replace" or best_distance > min_margin):
-					ways_elveg[ best_id ]['osm_id'] = osm_id
-					ways_osm[ osm_id ]['elveg_id'] = best_id
 					count_swap += 1
 					total_distance += best_distance
-					ways_elveg[ best_id ]['swap_no'] = count_swap  # Debug
-					ways_elveg[ best_id ]['distance'] = best_distance  # Debug
+					if "osm_id" not in ways_elveg[ best_id ]:
+						ways_osm[ osm_id ]['elveg_id'] = best_id
+						ways_elveg[ best_id ]['osm_id'] = osm_id
+						ways_elveg[ best_id ]['swap_no'] = count_swap  # Debug
+						ways_elveg[ best_id ]['distance'] = best_distance  # Debug
+					elif merge_all:
+						ways_osm[ osm_id ]['remove'] = True
 
 		message ("\r%i highways matched, %i not matched" % (count_swap, count_osm_roads - count_swap))
 		message ("\n%i missing ways added from Elveg" % (count_elveg - count_swap))
@@ -488,6 +498,11 @@ if __name__ == '__main__':
 
 	message ("\nTransfer elements ...")
 
+	# Empty start for 'new'
+	if command == "new":
+		root_osm = ElementTree.Element("osm", version="0.6")
+		tree_osm = ElementTree.ElementTree(root_osm)
+
 	for way in root_osm.findall("way"):
 		osm_id = way.attrib['id']
 
@@ -495,12 +510,12 @@ if __name__ == '__main__':
 
 		if command == "replace" and "elveg_id" in ways_osm[ osm_id ]:
 
+			elveg_id = ways_osm[ osm_id ]['elveg_id'] 
+			elveg_way = ways_elveg[ elveg_id ]['index']
+
 			for tag_osm in way.findall("tag"):
 				if tag_osm.attrib['k'] in avoid_merge:
 					way.remove(tag_osm)
-
-			elveg_id = ways_osm[ osm_id ]['elveg_id'] 
-			elveg_way = ways_elveg[ elveg_id ]['index']
 
 			for tag_elveg in elveg_way.iter("tag"):
 				tag_osm = way.find("tag[@k='%s']" % tag_elveg.attrib['k'])
@@ -526,6 +541,16 @@ if __name__ == '__main__':
 				way.append(ElementTree.Element("nd", ref=node.attrib['ref']))
 
 			way.set("action", "modify")
+
+		# Remove way
+
+		elif command == "replace" and "remove" in ways_osm[ osm_id ]:
+
+			for node in way.findall('nd'):
+				nodes_osm[ node.attrib['ref'] ]['used'] -= 1
+				way.remove(node)
+
+			way.set("action", "delete")
 
 		# Regplace tags only
 
@@ -609,6 +634,7 @@ if __name__ == '__main__':
 
 	message ("\nSave file ...")
 
+	root_osm.set("generator", "elveg_merge v"+version)
 	root_osm.set("upload", "false")
 
 	if filename_osm.find(".osm") >= 0:
@@ -622,4 +648,3 @@ if __name__ == '__main__':
 
 	time_lapsed = time.time() - start_time
 	message ("Time: %i seconds (%i ways per second)\n" % (time_lapsed, (count_elveg + count_osm) / time_lapsed))
-
