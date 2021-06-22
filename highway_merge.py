@@ -15,10 +15,18 @@ import sys
 import time
 import math
 import json
+import os.path
+import urllib.request, urllib.parse
 from xml.etree import ElementTree
 
 
-version = "2.0.0"
+version = "2.1.0"
+
+request_header = {"User-Agent": "osmno/highway_merge/" + version}
+
+overpass_api = "https://overpass-api.de/api/interpreter"  # Overpass endpoint
+
+import_folder = "~/Jottacloud/osm/nvdb/"  # Folder containing import highway files (default folder tried first)
 
 # Paramters for matching
 
@@ -204,16 +212,92 @@ def match_ways (way1, way2, best_distance):
 
 
 
+# Identify municipality name, unless more than one hit
+# Returns municipality number, or input parameter if not found
+
+def get_municipality (parameter):
+
+	if parameter.isdigit():
+		return parameter
+
+	else:
+		parameter = parameter
+		found_id = ""
+		duplicate = False
+		for mun_id, mun_name in iter(municipalities.items()):
+			if parameter.lower() == mun_name.lower():
+				return mun_id
+			elif parameter.lower() in mun_name.lower():
+				if found_id:
+					duplicate = True
+				else:
+					found_id = mun_id
+
+		if found_id and not duplicate:
+			return found_id
+		else:
+			return parameter
+
+
+
+# Load dict of all municipalities
+
+def load_municipalities():
+
+	url = "https://ws.geonorge.no/kommuneinfo/v1/fylkerkommuner?filtrer=fylkesnummer%2Cfylkesnavn%2Ckommuner.kommunenummer%2Ckommuner.kommunenavnNorsk"
+	file = urllib.request.urlopen(url)
+	data = json.load(file)
+	file.close()
+	for county in data:
+		for municipality in county['kommuner']:
+			municipalities[ municipality['kommunenummer'] ] = municipality['kommunenavnNorsk']
+
+
+
 # Load files and build data structure for analysis
 
 def load_files (filename_osm, filename_nvdb):
 
 	global tree_osm, root_osm, tree_nvdb, root_nvdb, count_osm_roads
 
-	tree_osm = ElementTree.parse(filename_osm)
-	root_osm = tree_osm.getroot()
+	# Load OSM file
 
-	tree_nvdb = ElementTree.parse(filename_nvdb)
+	if ".osm" not in filename_osm.lower():
+		municipality_id = get_municipality(filename_osm)
+		if municipality_id in municipalities:
+			message ("Loading municipality %s %s ..." % (municipality_id, municipalities[municipality_id]))
+			filename_nvdb = "nvdb_%s_%s.osm" % (municipality_id, municipalities[municipality_id].replace(" ", "_"))
+
+			query = '[timeout:90];(area[ref=%s][admin_level=7][place=municipality];)->.a;(nwr["highway"](area.a););(._;>;<;);out meta;' % municipality_id
+			request = urllib.request.Request(overpass_api + "?data=" + urllib.parse.quote(query), headers=request_header)
+			file = urllib.request.urlopen(request)
+			data = file.read()
+			file.close()
+
+			root_osm = ElementTree.fromstring(data)
+			tree_osm = ElementTree.ElementTree(root_osm)
+
+		else:
+			sys.exit("\n*** Municipality '%s' not found\n\n" % filename_osm)
+	else:
+		message ("Loading files '%s' and '%s' ..." % (filename_osm, filename_nvdb))
+		if os.path.isfile(filename_osm):
+			tree_osm = ElementTree.parse(filename_osm)
+			root_osm = tree_osm.getroot()
+		else:
+			sys.exit("\n*** File '%s' not found\n\n" % filename_osm)
+
+	# Load NVDB file
+
+	full_filename_nvdb = filename_nvdb
+	if not os.path.isfile(full_filename_nvdb):
+		test_filename = os.path.expanduser(import_folder + filename_nvdb)
+		if os.path.isfile(test_filename):
+			full_filename_nvdb = test_filename
+		else:
+			sys.exit("\n*** File '%s' not found\n\n" % filename_nvdb)
+
+	tree_nvdb = ElementTree.parse(full_filename_nvdb)
 	root_nvdb = tree_nvdb.getroot()
 
 	# Prepare nodes
@@ -616,6 +700,25 @@ def add_new_highways():
 
 
 
+# Indent XML output
+
+def indent_tree(elem, level=0):
+    i = "\n" + level*"  "
+    if len(elem):
+        if not elem.text or not elem.text.strip():
+            elem.text = i + "  "
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+        for elem in elem:
+            indent_tree(elem, level+1)
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+    else:
+        if level and (not elem.tail or not elem.tail.strip()):
+            elem.tail = i
+
+
+
 # Prepare and output file
 
 def output_file (osm_filename):
@@ -785,11 +888,11 @@ def output_file (osm_filename):
 
 	root_osm.set("generator", "highway_merge v"+version)
 	root_osm.set("upload", "false")
+	indent_tree(root_osm)
 
-	if filename_osm.find(".osm") >= 0:
-		filename_out = filename_osm.replace(".osm", "_%s.osm" % command)
-	else:
-		filename_out = filename_osm + "_%s.osm" % command
+	filename_out = filename_osm.replace(" ", "_").replace(".osm", "") + "_%s.osm" % command
+	if ".osm" not in filename_osm.lower() and command == "new":
+		filename_out = filename_out.replace("_new.", "_missing.")
 
 	tree_osm.write(filename_out, encoding='utf-8', method='xml', xml_declaration=True)
 
@@ -807,16 +910,23 @@ if __name__ == '__main__':
 		command = sys.argv[1].lower().strip("-")
 		filename_osm = sys.argv[2]
 		filename_nvdb = sys.argv[3]
+
+	elif len(sys.argv) == 3 and ".osm" not in sys.argv[2].lower() and sys.argv[1].lower() in ["-new", "-offset", "-replace", "-tag"]:
+		command = sys.argv[1].lower().strip("-")
+		filename_osm = sys.argv[2]
+		filename_nvdb = filename_osm
+
 	else:
 		message ("Please include 1) '-new'/'-offset'/'-replace'/'-tag' 2) OSM file and 3) NVDB file as parameters\n")
 		sys.exit()
-
-	message ("Loading files '%s' and '%s' ..." % (filename_osm, filename_nvdb))
 
 	ways_osm = {}
 	ways_nvdb = {}
 	nodes = {}
 	test_lines = []  # For debug
+	municipalities = {}
+
+	load_municipalities()
 
 	load_files (filename_osm, filename_nvdb)
 
