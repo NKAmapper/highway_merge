@@ -15,6 +15,10 @@ python highway_merge.py [-new | -replace | -offset | -tag] [OSM file] [NVDB file
   * <code>-offset</code>: All NVDB highways with more than a predefined average offset are included (but not merged).
   * <code>-tag</code>: Highways in OSM are updated with tags from NVDB, such as maxspeed, name etc. (no new geometry).
 
+* Data files:
+  * The [NVDB file](https://www.jottacloud.com/s/059f4e21889c60d4e4aaa64cc857322b134) must be downloaded before you run the program.
+  * Instead of the _OSM file_ and _NVDB file_ parameters, you may provide the name of the municipality (Norway only).
+
 * Matching of highways between OSM and NVDB:
   * Matching is based on the average distance between the two highways from OSM and NVDB.
   * Segments more than 25 meters away are not considered.
@@ -34,6 +38,9 @@ python highway_merge.py [-new | -replace | -offset | -tag] [OSM file] [NVDB file
 
 ### Changelog
 
+* 2.1: Automatic loading of data for municipality:
+  - Provide municipality name instead of file names.
+  - Will fetch OSM data via Overpass.
 * 2.0: Major update of the matching algorithm:
   - Distance to line now used instead of distance to node.
   - Reverse matching before accepting a match between two ways.
