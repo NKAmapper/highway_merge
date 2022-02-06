@@ -20,7 +20,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree
 
 
-version = "2.2.0"
+version = "2.2.1"
 
 request_header = {"User-Agent": "osmno/highway_merge/" + version}
 
@@ -62,7 +62,7 @@ update_tags = ["ref", "name", "maxspeed", "maxheight", "bridge", "tunnel", "laye
 # Pedestrian highways which should not be mixed with other highway classes for cars
 pedestrian_highway = ["footway", "cycleway"]
 
-# Pubklic highways which should not be mixed with other highway classes
+# Public highways which should not be mixed with other highway classes
 public_highway = ["motorway", "trunk", "primary", "secondary", "motorway_link", "trunk_link", "primary_link", "secondary_link"]
 
 # Only consider the following highway categories when merging (leave empty [] to merge all)
@@ -565,7 +565,7 @@ def merge_highways(command):
 
 					# Avoid mixing trunk etc with lower highway classes
 					if nvdb_way['highway'] in public_highway and osm_way['highway'] not in public_highway or \
-						osm_way['highway'] in public_highway and nvdb_way['highway'] not in public_highway:
+						osm_way['highway'] in public_highway and nvdb_way['highway'] not in public_highway + ['road']:
 						continue
 
 					# Check if match between OSM and NVDB way, and determine if closest distance between them
