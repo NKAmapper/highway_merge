@@ -20,13 +20,17 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree
 
 
-version = "2.2.3"
+version = "2.3.0"
 
 request_header = {"User-Agent": "osmno/highway_merge/" + version}
 
 overpass_api = "https://overpass-api.de/api/interpreter"  # Overpass endpoint
 
 import_folder = "~/Jottacloud/osm/nvdb/"  # Folder containing import highway files (default folder tried first)
+
+nvdb_sweden_site = "https://nvdb-osm-map-data.s3.amazonaws.com/osm/"  # All Sweden .osm NVDB files
+
+country = "Norway"  # Argument "-swe" for Sweden
 
 # Paramters for matching
 
@@ -63,7 +67,7 @@ update_tags = ["ref", "name", "maxspeed", "maxheight", "bridge", "tunnel", "laye
 pedestrian_highway = ["footway", "cycleway"]
 
 # Public highways which should not be mixed with other highway classes
-public_highway = ["motorway", "trunk", "primary", "secondary", "tertiary", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"]
+public_highway = ["motorway", "trunk", "primary", "secondary", "motorway_link", "trunk_link", "primary_link", "secondary_link"]
 
 # Only consider the following highway categories when merging (leave empty [] to merge all)
 replace_highway = []
@@ -273,15 +277,29 @@ def get_municipality (parameter):
 
 # Load dict of all municipalities
 
-def load_municipalities():
+def load_municipalities(country):
 
-	url = "https://ws.geonorge.no/kommuneinfo/v1/fylkerkommuner?filtrer=fylkesnummer%2Cfylkesnavn%2Ckommuner.kommunenummer%2Ckommuner.kommunenavnNorsk"
-	file = urllib.request.urlopen(url)
-	data = json.load(file)
-	file.close()
-	for county in data:
-		for municipality in county['kommuner']:
-			municipalities[ municipality['kommunenummer'] ] = municipality['kommunenavnNorsk']
+	if country == "Sweden":
+
+		url = "https://catalog.skl.se/rowstore/dataset/b80d412c-9a81-4de3-a62c-724192295677?_limit=400"
+		file = urllib.request.urlopen(url)
+		data = json.load(file)
+		file.close()
+		for municipality in data['results']:
+			municipalities[ municipality['kommunkod'] ] = municipality['kommun']
+
+#		message ("%s\n" % municipalities)
+
+
+	else:  # Default Norway
+
+		url = "https://ws.geonorge.no/kommuneinfo/v1/fylkerkommuner?filtrer=fylkesnummer%2Cfylkesnavn%2Ckommuner.kommunenummer%2Ckommuner.kommunenavnNorsk"
+		file = urllib.request.urlopen(url)
+		data = json.load(file)
+		file.close()
+		for county in data:
+			for municipality in county['kommuner']:
+				municipalities[ municipality['kommunenummer'] ] = municipality['kommunenavnNorsk']
 
 
 
@@ -299,9 +317,15 @@ def load_files (name_osm):
 		if municipality_id in municipalities:
 			message ("Loading municipality %s %s from OSM ..." % (municipality_id, municipalities[municipality_id]))
 			filename_osm = "nvdb_%s_%s" % (municipality_id, municipalities[municipality_id].replace(" ", "_"))
-			filename_nvdb = filename_osm + ".osm"
+
+			if country == "Sweden":
+				filename_nvdb = municipalities[municipality_id] + ".osm"
+				query = '[timeout:90];(area["ref:scb"=%s][admin_level=7];)->.a;(nwr["highway"](area.a););(._;>;<;);out meta;' % municipality_id
+			else:  # Norway
+				filename_nvdb = filename_osm + ".osm"
+				query = '[timeout:90];(area[ref=%s][admin_level=7][place=municipality];)->.a;(nwr["highway"](area.a););(._;>;<;);out meta;' % municipality_id
+
 			filename_osm += ".osm"
-			query = '[timeout:90];(area[ref=%s][admin_level=7][place=municipality];)->.a;(nwr["highway"](area.a););(._;>;<;);out meta;' % municipality_id
 			request = urllib.request.Request(overpass_api + "?data=" + urllib.parse.quote(query), headers=request_header)
 			file = open_url(request)
 			data = file.read()
@@ -322,15 +346,26 @@ def load_files (name_osm):
 
 	# Load NVDB file
 
-	full_filename_nvdb = filename_nvdb
-	if not os.path.isfile(full_filename_nvdb):
-		test_filename = os.path.expanduser(import_folder + filename_nvdb)
-		if os.path.isfile(test_filename):
-			full_filename_nvdb = test_filename
-		else:
-			sys.exit("\n*** File '%s' not found\n\n" % filename_nvdb)
+	if country == "Sweden":
+		request = urllib.request.Request(nvdb_sweden_site + filename_nvdb, headers=request_header)
+		try:
+			file = urllib.request.urlopen(request)
+		except UnicodeEncodeError:
+			sys.exit("\n*** File '%s' not available\n\n" % (nvdb_sweden_site + filename_nvdb))
+		data = file.read()
+		tree_nvdb = ElementTree.ElementTree(ElementTree.fromstring(data))
 
-	tree_nvdb = ElementTree.parse(full_filename_nvdb)
+	else:  # Norway
+		full_filename_nvdb = filename_nvdb
+		if not os.path.isfile(full_filename_nvdb):
+			test_filename = os.path.expanduser(import_folder + filename_nvdb)
+			if os.path.isfile(test_filename):
+				full_filename_nvdb = test_filename
+			else:
+				sys.exit("\n*** File '%s' not found\n\n" % filename_nvdb)
+
+		tree_nvdb = ElementTree.parse(full_filename_nvdb)
+
 	root_nvdb = tree_nvdb.getroot()
 
 	# Prepare nodes
@@ -954,7 +989,9 @@ if __name__ == '__main__':
 		sys.exit()
 
 	municipalities = {}
-	load_municipalities()
+	if "-swe" in sys.argv:
+		country = "Sweden"
+	load_municipalities(country)
 
 	if filename_osm.lower() == "norge":
 		iterate_municipalities = sorted(municipalities.keys())
