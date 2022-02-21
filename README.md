@@ -21,7 +21,7 @@ python highway_merge.py [-new | -replace | -offset | -tag] [municipality name or
 
 * Data files:
   * The [NVDB file](https://www.jottacloud.com/s/059f4e21889c60d4e4aaa64cc857322b134) must be downloaded before you run the program.
-  * Instead of the _OSM file_ and _NVDB file_ parameters, you may provide the name of the municipality (Norway and Sweden only), or "Norge" for all municipalities in one go. Existing highways will be loaded from OSM automatically.
+  * Instead of the _OSM file_ and _NVDB file_ parameters, you may provide the name of the municipality (Norway and Sweden only); add <code>-swe</code> to use a Swedish municipality name. "Norge" will produce all municipalities in one go. Existing highways will be loaded from OSM automatically.
 
 * Matching of highways between OSM and NVDB:
   * Matching is based on the average distance between the two highways from OSM and NVDB.
