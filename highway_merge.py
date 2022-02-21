@@ -20,7 +20,7 @@ import urllib.request, urllib.parse
 from xml.etree import ElementTree
 
 
-version = "2.2.1"
+version = "2.2.2"
 
 request_header = {"User-Agent": "osmno/highway_merge/" + version}
 
@@ -289,7 +289,7 @@ def load_municipalities():
 
 def load_files (name_osm):
 
-	global tree_osm, root_osm, tree_nvdb, root_nvdb, count_osm_roads, filename_osm
+	global tree_osm, root_osm, tree_nvdb, root_nvdb, count_osm_roads, filename_osm, filename_nvdb
 
 	# Load OSM file
 
