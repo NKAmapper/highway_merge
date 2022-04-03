@@ -16,11 +16,11 @@ import time
 import math
 import json
 import os.path
-import urllib.request, urllib.parse
+import urllib.request, urllib.parse, urllib.error
 from xml.etree import ElementTree
 
 
-version = "2.3.0"
+version = "2.3.1"
 
 request_header = {"User-Agent": "osmno/highway_merge/" + version}
 
@@ -347,10 +347,10 @@ def load_files (name_osm):
 	# Load NVDB file
 
 	if country == "Sweden":
-		request = urllib.request.Request(nvdb_sweden_site + filename_nvdb, headers=request_header)
+		request = urllib.request.Request(nvdb_sweden_site + urllib.parse.quote(filename_nvdb), headers=request_header)
 		try:
 			file = urllib.request.urlopen(request)
-		except UnicodeEncodeError:
+		except urllib.error.HTTPError:
 			sys.exit("\n*** File '%s' not available\n\n" % (nvdb_sweden_site + filename_nvdb))
 		data = file.read()
 		tree_nvdb = ElementTree.ElementTree(ElementTree.fromstring(data))
