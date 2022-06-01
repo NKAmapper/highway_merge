@@ -63,20 +63,19 @@ Use the -replace argument for municipalities which are missing the majority of h
 3. Search `highway -modified -path` to get all existing OSM highways which were not merged. Put them into the _To-Do_ plugin, step through each highway and merge it or delete it. The NVDB tag contains the highway class from the NVDB file.
 4. Continue as in step 4-6 in the above section.
 
-#### With `-tagref`/`-taglocal argument
+#### With `-tagref`/`-taglocal` argument
 Use the -tagref and -taglocal arguments for municipalities where most of the highways are already in OSM. It will automaticlly match highways in OSM with NVDB and retag highways with a close match acoording to tags in the NVDB source data. This way, the road network in OSM may be updated with new or missing maxspeed, name, access restrictions etc.
 1. Run (for example) `python highway_merge.py -tagref Bodø`and load the resulting file into JOSM.
 2. In JOSM, first search `NO_MATCH` to get an overview of which highways were not matched. For -tagref, no matches are often caused by different ref=* in OSM and NVDB.
 3. Search `EDIT` to get an overview of which tags have been added or replaced (no tags will be deleted).
+5. Search `"bridge:description"` for possible bridge names and `"tunnel:name"`for possible tunnel names.
 4. Search `CONSIDER` to check if any additional retagging should be done, for example:
-   - Serach `"bridge:description"` for possible bridge names.
-   - Search `"tunnel:names"`for possible tunnel names.
-   - Search `"Add motor_vehicle"` and `"Add psv"` for possible access restrictions.
-   - Search `"turn:lanes"` for possible lane tagging.
-   - Search `"Add oneway"` for possible one way streets.
-5. Search `NEW_SEGMENT waylength:-100` to check if any new highways segments could be merged with a neighbour segment (often happens at the end of tunnels, bridges and maxspeed sections).
+   - Search `CONSIDER:"Add motor_vehicle"` and `CONSIDER:"Add psv"` for possible access restrictions.
+   - Search `CONSIDER:"turn:lanes"` for possible lane tagging.
+   - Search `CONSIDER:"Add oneway"` for possible one way streets.
+5. Search `NEW_SEGMENT waylength:-100` to check if any new highways segments could be merged with a neighbour segment (could be the case at the end of tunnels, bridges and maxspeed sections).
 6. Other differences are shown in the `DIFF` tag.
-7. Search for `modified` and delete the upper case tags. Then upload to OSM.
+7. Search for `modified` and delete the upper case tags (upper case tags which are not marked as modified will not be uploaded). Then upload to OSM.
 
 ### Changelog
 
