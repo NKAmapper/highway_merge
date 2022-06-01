@@ -55,7 +55,7 @@ Use the `-new` argument for municipalities which have most highways already mapp
 5. Search `type:way -(modified or parent modified)` to check if there are any remaining new highways which have not yet been attached to the highway network, and fix them.
 6. Carry out other quality checks and enhancements and upload to OSM.
 
-#### With -replaced argument
+#### With `-replace` argument
 
 Use the -replace argument for municipalities which are missing the majority of highways in OSM. It will automatically match highways in OSM with NVDB and merge all highways with a close match, while leaving the rest for manual conflation. This may speed up to import process significantly.
 1. Run (for example) `python highway_merge.py -replace Dals-Ed -swe` and load the resulting file into JOSM.
@@ -63,7 +63,7 @@ Use the -replace argument for municipalities which are missing the majority of h
 3. Search `highway -modified -path` to get all existing OSM highways which were not merged. Put them into the _To-Do_ plugin, step through each highway and merge it or delete it. The NVDB tag contains the highway class from the NVDB file.
 4. Continue as in step 4-6 in the above section.
 
-#### With -replaced argument
+#### With `-tagref`/`-taglocal argument
 Use the -tagref and -taglocal arguments for municipalities where most of the highways are already in OSM. It will automaticlly match highways in OSM with NVDB and retag highways with a close match acoording to tags in the NVDB source data. This way, the road network in OSM may be updated with new or missing maxspeed, name, access restrictions etc.
 1. Run (for example) `python highway_merge.py -tagref Bodø`and load the resulting file into JOSM.
 2. In JOSM, first search `NO_MATCH` to get an overview of which highways were not matched. For -tagref, no matches are often caused by different ref=* in OSM and NVDB.
