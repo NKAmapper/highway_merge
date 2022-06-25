@@ -99,6 +99,7 @@ Use the -tagref and -taglocal arguments for municipalities where most of the hig
 ### References
 
 * [Guide to NVDB import](https://wiki.openstreetmap.org/wiki/No:Veileder_Elveg-import)
-* [Progress for NVDB import](https://wiki.openstreetmap.org/wiki/Import/Catalogue/Road_import_(Norway)/Progress)
+* [Highway update progress for NVDB import](https://wiki.openstreetmap.org/wiki/Import/Catalogue/Road_import_(Norway)/Update)
+* [Tag update progress for NVDB import](https://wiki.openstreetmap.org/wiki/Import/Catalogue/Road_import_(Norway)/Tag_Update)
 * [nvdb2osm](https://github.com/NKAmapper/nvdb2osm) on GitHub
 * [NVDB files](https://www.jottacloud.com/s/059f4e21889c60d4e4aaa64cc857322b134)
