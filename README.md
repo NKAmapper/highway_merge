@@ -79,6 +79,7 @@ Use the -tagref and -taglocal arguments for municipalities where most of the hig
 
 ### Changelog
 
+* 3.1: Improve suggestions in CONSIDER and DIFF tags.
 * 3.0: Add "-tagref" and "-taglocal" commands to retag existing highways in OSM according to NVDB source tags.
   - Also add "-progress" function to update tagging progress status for given municipality.
 * 2.3: Add support for automatic loading of data for Swedish municipalities ("-swe" argument).
