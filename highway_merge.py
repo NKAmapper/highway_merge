@@ -2,7 +2,7 @@
 # -*- coding: utf8
 
 # highway_merge.py
-# Replace OSM highways with NVDB
+# Replace OSM highways or tags with NVDB
 # Usage: python highway_merge.py [command] [input_osm.osm] [input_nvdb.osm]
 #    or: python highway_merge.py [command] [municipality name]
 # Commands: - replace: Merge all existing OSM highways with NVDB
@@ -14,6 +14,7 @@
 
 import sys
 import time
+import datetime
 import math
 import copy
 import json
@@ -22,7 +23,7 @@ import urllib.request, urllib.parse, urllib.error
 from xml.etree import ElementTree
 
 
-version = "3.0.0"
+version = "3.1.0"
 
 request_header = {"User-Agent": "osmno/highway_merge/" + version}
 
@@ -59,11 +60,11 @@ min_nodes = 2       # Min number of nodes in a way to be matched
 # The following lists are for the replace command:
 
 # Do not merge OSM ways with the folowing highway categories
-avoid_highway = ["path", "bus_stop", "rest_area", "platform", "construction", "proposed"]
+avoid_highway = ["path", "bus_stop", "rest_area", "platform", "construction", "proposed"]  # Platform ok for "new" function
 
 # Do not merge OSM ways with the following keys
-avoid_tags = ["area", "railway", "piste:type", "snowmobile", "turn:lanes", "turn:lanes:forward", "turn:lanes:backward", \
-			 "destination", "destination:forward", "destination:backward", "destination:ref", "destination:ref:forward", "destination:ref:backward", \
+avoid_tags = ["area", "railway", "piste:type", "snowmobile", "turn:lanes", "turn:lanes:forward", "turn:lanes:backward",
+			 "destination", "destination:forward", "destination:backward", "destination:ref", "destination:ref:forward", "destination:ref:backward",
 			 "destination:symbol", "destination:symbol:forward", "destination:symbol:backward", "mtb:scale", "class:bicycle:mtb"]
 
 # Overwrite with the following tags from NVDB when merging ways, including deletion if not present in NVDB (not used by "-tagref" function)
@@ -87,8 +88,8 @@ replace_highway = []
 # The folloing lists are for the tagref/taglocal commands:
 
 # Include the following tags from NVDB when marking tags in OSM for consideration
-core_tags = ["highway", "ref", "oneway", "lanes", "junction", "name", "maxspeed", "maxheight", "maxweight", "maxlength", "motorroad", \
-			 "motor_vehicle", "psv", "foot", "bicycle", "agriculatural", "hgv", "cycleway", \
+core_tags = ["highway", "ref", "oneway", "lanes", "junction", "name", "maxspeed", "maxheight", "maxweight", "maxlength", "motorroad",
+			 "motor_vehicle", "psv", "foot", "bicycle", "agriculatural", "hgv", "cycleway",
 			 "bridge", "tunnel", "layer", "bridge:description", "tunnel:name", "tunnel:description", "turn"]
 
 # Include the following suffixes to the core tags above when reporting tags to consider
@@ -98,14 +99,16 @@ tag_suffixes = ["", ":lanes", ":forward", ":backward", ":lanes:forward", ":lanes
 avoid_update_tags = ["ref", "highway", "oneway", "lanes", "surface"]
 
 # Store progress report for the following tags
-progress_tags = ["highway", "junction", "name", "maxspeed", "maxweight", "maxlength", "motorroad", \
+progress_tags = ["highway", "junction", "name", "maxspeed", "maxweight", "maxlength", "motorroad",
 				"motor_vehicle", "psv", "foot", "bicycle", "agricultural", "hgv", "cycleway", "bridge", "tunnel", "layer"]
 
 # The following tags will be deleted
 delete_tags = ["int_ref", "nvdb:id", "nvdb:date", "attribution", "maxspeed:type", "postal_code"]  # Also "source" handled in code
 
 # The following tags will be deleted if the value is "no"
-delete_negative_tags = ["sidewalk", "cycleway", "cycleway:both", "cycleway:right", "cycleway:left", "oneway", "lit", "island:crossing", "tactile_paving"]
+delete_negative_tags = ["sidewalk", "sidewalk:both", "sidewalk:left", "sidewalk:right",
+						"cycleway", "cycleway:both", "cycleway:right", "cycleway:left",
+						"oneway", "lit", "island:crossing", "tactile_paving", "lane_markings"]
 
 # Public highways (national/county) which should not be mixed with other highway classes
 state_highway = ["motorway", "trunk", "primary", "secondary", "motorway_link", "trunk_link", "primary_link", "secondary_link"]  # + "tertiary" included for Sweden
@@ -768,7 +771,7 @@ def merge_highways(command):
 
 	# Report result
 
-	message ("\r  \t%i highways matched, %i not matched\n" % (count_swap, count_osm_roads - count_swap))
+	message ("\r   \t%i highways matched, %i not matched\n" % (count_swap, count_osm_roads - count_swap))
 	if command == "replace":
 		message ("\t%i missing highways added from NVDB\n" % (len(nvdb_ways) - count_swap))
 	message ("\tAverage offset: %.1f m\n" % (total_distance / count_swap))
@@ -781,6 +784,9 @@ def merge_highways(command):
 def add_new_highways():
 
 	message ("Add missing highways ...\n")
+
+	if "platform" in avoid_highway:
+		avoid_highway.remove("platform")  # highway=platform is ok for this function
 
 	count = len(nvdb_ways)
 	count_missing = 0
@@ -852,17 +858,19 @@ def update_tags(tags1, tags2):
 				target_tags[key] = value
 
 	for key, value in iter(target_tags.items()):
-		if key not in avoid_update_tags and ":lanes" not in key and "|" not in value and \
-				":forward" not in key and ":backward" not in key and ":left" not in key and ":right" not in key and \
-				not (key == "name" and "name" in tags1 and \
-					("bridge" in tags1 and ("bru" in tags1["name"].lower() or "bro" in tags1["name"].lower()) or \
-					("tunnel" in tags1 and ("tunnel" in tags1["name"] or "port" in tags1['name'].lower() or "lokk" in tags1['name'].lower())))) and \
-				not (key == "bridge:description" and "name" in tags1 and tags1['name'] == value) and \
-				not (key == "tunnel:name" and "name" in tags1 and tags1['name'] == value) and \
-				not (key == "bridge" and "bridge" in tags1) and \
-				not (key == "tunnel" and "tunnel" in tags1) and \
-				not (key == "layer" and "layer" in tags1 and ("-" in value) == ("-" in tags1['layer'])) and \
-				not (key == "maxspeed" and ("maxspeed:forward" in tags1 or "maxspeed:backward" in tags1)):
+		if (key not in avoid_update_tags and ":lanes" not in key and "|" not in value and
+				":forward" not in key and ":backward" not in key and ":left" not in key and ":right" not in key and
+				not (key == "name" and "name" in tags1 and
+					("bridge" in tags1 and ("bru" in tags1["name"].lower() or "bro" in tags1["name"].lower()) or
+					("tunnel" in tags1 and ("tunnel" in tags1["name"] or "port" in tags1['name'].lower() or "lokk" in tags1['name'].lower())))) and
+				not (key == "bridge:description" and "name" in tags1 and
+					(tags1['name'] == value and "bru" in value or tags1['name'] == value + " bru")) and
+				not (key == "tunnel:name" and "name" in tags1 and tags1['name'] == value) and
+				not (key == "bridge" and "bridge" in tags1) and
+				not (key == "tunnel" and "tunnel" in tags1) and
+				not (key == "layer" and "layer" in tags1 and ("-" in value) == ("-" in tags1['layer'])) and
+				not (key == "maxspeed" and ("maxspeed:forward" in tags1 or "maxspeed:backward" in tags1)) and
+				not (key == "cycleway" and ("cycleway:right" in tags1 or "cyclway:left" in tags1))):
 #				not (key == "surface" and value == "asphalt"):
 
 			new_tags[ key ] = value
@@ -1340,11 +1348,14 @@ def update_xlm_tags(way, osm_id):
 	# True if tag should be removed
 	def remove_tags(key, value, tags):
 
-		return (key in delete_tags or key in delete_negative_tags and value in ["no", "none"] or 
-			"source" in key or key == "maxheight" and value == "default" or 
-			key == "lanes" and 
-			 	("oneway" not in tags and value in ["1", "2"] and "turn:lanes:forward" not in tags and "turn:lanes:backward" not in tags or 
-			 	"oneway" in tags and tags['oneway'] == "yes" and value == "1" and "turn:lanes" not in tags))
+		return (key in delete_tags
+				or key in delete_negative_tags and value in ["no", "none"]
+				or "source" in key
+				or key == "maxheight" and value == "default"
+				or key == "lanes" and "junction" not in tags
+					and (("oneway" not in tags or tags['oneway'] == "no")
+							and value in ["1", "2"] and "turn:lanes:forward" not in tags and "turn:lanes:backward" not in tags
+						or "oneway" in tags and tags['oneway'] == "yes" and value == "1" and "turn:lanes" not in tags))
 
 	# Main function
 	if "nvdb_id" in osm_ways[ osm_id ]:
@@ -1374,13 +1385,19 @@ def update_xlm_tags(way, osm_id):
 				count_updated_tags(key)
 
 			elif key not in nvdb_tags:
-				if any(key.replace(suffix, "") in core_tags for suffix in tag_suffixes) and \
-						not (key == "name" and \
-							("tunnel:name" in nvdb_tags and value == nvdb_tags['tunnel:name'] or \
-							"bridge:description" in nvdb_tags and value == nvdb_tags['bridge:description'])):
-					consider_tags.append("Remove %s=%s" % (key, value))
-				elif key != key.upper():
+				if (any(key.replace(suffix, "") in core_tags for suffix in tag_suffixes)
+					and not (any(check_key in key for check_key in ["bridge", "tunnel", "turn:lanes", "turn:lanes:forward", "turn:lanes:backward"]))
+					and not (key == "layer"
+						and ("bridge" in osm_tags
+							or "tunnel" in osm_tags))
+					and not (key == "name"
+						and ("tunnel:name" in nvdb_tags and value == nvdb_tags['tunnel:name']
+							or "bridge:description" in nvdb_tags and value == nvdb_tags['bridge:description']
+							or "junction" in osm_tags and osm_tags['junction'] == "roundabout" and "kryss" in value))):
 					diff_tags.append("Remove %s=%s" % (key, value))
+
+#				elif key != key.upper():
+#					diff_tags.append("Remove %s=%s" % (key, value))
 
 		# New tags added to OSM
 		for key, value in iter(new_tags.items()):
@@ -1391,14 +1408,28 @@ def update_xlm_tags(way, osm_id):
 
 		# Tags in NVDB but not in OSM (and not added)
 		for key, value in iter(nvdb_tags.items()):
-			if key in core_tags and key not in new_tags and key in osm_tags and value != osm_tags[key]:
+			if (key in core_tags
+				and key not in new_tags
+				and key in osm_tags
+				and value != osm_tags[key]
+				and not (key == "name"
+					and ("tunnel" in osm_tags['name']
+						or "bru" in osm_tags['name']))):
 				consider_tags.append("Modify %s=%s to %s" % (key, osm_tags[key], value))
+
 			elif key not in new_tags and key not in osm_tags:
-				if any(key.replace(suffix, "") in core_tags for suffix in tag_suffixes) and \
-						not (key in ["tunnel:name", "bridge:description"] and "name" in osm_tags and value == osm_tags['name']):
-					consider_tags.append("Add %s=%s" % (key, value))
-				else:
-					diff_tags.append("Add %s=%s" % (key, value))
+				if (not (key == "oneway"
+						and "junction" in osm_tags
+						and osm_tags['junction'] == "roundabout")
+					and not (key in ["tunnel:name", "bridge:description"]
+						and "name" in osm_tags
+						and (value == osm_tags['name']
+							or value + " bru" == osm_tags['name']))):
+					if (any(key.replace(suffix, "") in core_tags for suffix in tag_suffixes)
+							or key in ["maxspeed:forward", "maxspeed:backward"]):
+						consider_tags.append("Add %s=%s" % (key, value))
+					else:
+						diff_tags.append("Add %s=%s" % (key, value))
 
 		if "bridge_tunnel" in osm_ways[osm_id]:
 			consider_tags.append("Swap bridge/tunnel")
@@ -1615,6 +1646,12 @@ def output_file (osm_filename):
 		if tag != None:
 			way.remove(tag)
 			way.set("action", "modify")
+		if "action" in way.attrib and way.attrib['action'] == "modify":  # Also source tag if hit
+			tag = way.find("tag[@k='source']")
+			if tag != None:
+				way.remove(tag)
+				way.set("action", "modify")
+
 
 	# Add distance markers for debugging
 
@@ -1687,8 +1724,8 @@ def output_progress(municipality_id):
 			new_tags = update_tags(osm_tags, nvdb_tags)
 			found = False
 			for key, value in iter(new_tags.items()):
-				if (key not in osm_tags or osm_tags[key] != value) and \
-						any(key.replace(suffix, "") in progress_tags for suffix in tag_suffixes):
+				if ((key not in osm_tags or osm_tags[key] != value)
+						and any(key.replace(suffix, "") in progress_tags for suffix in tag_suffixes)):
 					count_tags += 1
 					found = True
 
@@ -1703,6 +1740,7 @@ def output_progress(municipality_id):
 	progress[ municipality_id ][ group + '_progress'] = count_highways
 	progress[ municipality_id ][ group + '_highways'] = len(segments)
 	progress[ municipality_id ][ 'highways'] = count_osm_roads
+	progress[ municipality_id ][ group + '_date'] = datetime.datetime.now().isoformat()[:10]
 
 	file = open(full_filename, "w")
 	json.dump(progress, file, indent=2, ensure_ascii=False)
@@ -1729,7 +1767,7 @@ if __name__ == '__main__':
 		filename_nvdb = filename_osm
 
 	else:
-		message ("Please include 1) -new/-offset/-replace/-tagref/-taglocal /2) OSM file and 3) NVDB file as parameters\n")
+		message ("Please include 1) -new/-offset/-replace/-tagref/-taglocal and either 2) municipality name, or 2) OSM file and 3) NVDB file as parameters\n")
 		sys.exit()
 
 	if "-debug" in sys.argv:
