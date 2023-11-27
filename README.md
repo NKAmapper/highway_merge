@@ -19,7 +19,7 @@ python highway_merge.py [-new | -replace | -offset | -tagref | -taglocal] [munic
   * <code>-replace</code>: All NVDB highways are merged.
   * <code>-offset</code>: All NVDB highways with more than a predefined average offset are included (but not merged).
   * <code>-tagref</code>: State and county highways with ref=* in OSM are updated with tags from NVDB, such as maxspeed, name etc. (no new geometry).
-  * <code>-tagref</code>: Local highways in OSM are updated with tags from NVDB, such as maxspeed, name etc. (no new geometry).
+  * <code>-taglocal</code>: Local highways in OSM are updated with tags from NVDB, such as maxspeed, name etc. (no new geometry).
 
 * Data files:
   * The [NVDB file](https://www.jottacloud.com/s/059f4e21889c60d4e4aaa64cc857322b134) must be downloaded before you run the program (except for Sweden).
