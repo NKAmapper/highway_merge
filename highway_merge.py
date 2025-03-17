@@ -882,7 +882,7 @@ def update_tags(tags1, tags2):
 				not (key == "tunnel" and "tunnel" in tags1) and
 				not (key == "layer" and "layer" in tags1 and ("-" in value) == ("-" in tags1['layer'])) and
 				not (key == "maxspeed" and ("maxspeed:forward" in tags1 or "maxspeed:backward" in tags1)) and
-				not (key == "cycleway" and ("cycleway:right" in tags1 or "cyclway:left" in tags1))):
+				not (key == "cycleway" and ("cycleway:right" in tags1 or "cycleway:left" in tags1))):
 #				not (key == "surface" and value == "asphalt"):
 
 			new_tags[ key ] = value
